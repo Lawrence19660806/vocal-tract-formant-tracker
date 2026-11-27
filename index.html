@@ -128,8 +128,8 @@
       </div>
       <button id="btnClear">Clear trail</button>
       <span class="label" style="margin-left:6px">Dot every</span>
-      <input type="range" id="interval" min="500" max="3000" step="100" value="1500" style="width:120px" />
-      <span id="intervalVal" class="hint">1.5 s</span>
+      <input type="range" id="interval" min="100" max="3000" step="100" value="100" style="width:120px" />
+      <span id="intervalVal" class="hint">0.1 s</span>
     </div>
     <div class="err" id="err"></div>
   </div>
@@ -161,6 +161,7 @@
         <div id="jawState">at rest</div>
       </div>
       <div class="metric"><div>Lips</div><div class="val" id="lipVal">closed</div><div id="lipState">at rest</div></div>
+      <div class="metric"><div>Tongue tip</div><div class="val" id="tipVal">—</div><div id="tipState">camera off · acoustic only</div></div>
       <div class="metric"><div>Nasality (velum)</div><div class="val" id="nasalVal">—</div>
         <div class="meter"><div id="nasalBar"></div></div>
         <div id="portState">port closed · oral</div>
@@ -180,8 +181,9 @@
       <li>Allow microphone access, then pick <b>Men</b> or <b>Women</b> as your reference (default: Men).</li>
       <li>Produce one vowel continuously and steadily (e.g. /i/ as in <i>heed</i>, /ɑ/ as in <i>hod</i>, /u/ as in <i>who'd</i>).</li>
       <li>The figure follows your voice: the <b>tongue, jaw and lips</b> take the posture of the vowel you are producing, and the <b>vocal folds</b> vibrate while you are voiced. Pick a <b>Target vowel</b> to see its tongue as a dashed outline and match it (with the microphone off, picking a target previews that vowel).</li>
-      <li>The <b>Vowel space</b> inset shows your production as a rose dot among the reference vowels; the faint trail shows your recent attempts (a dot every <span id="howtoInterval">1.5</span>&nbsp;s) — a tight cluster means you are consistent.</li>
+      <li>The <b>Vowel space</b> inset shows your production as a rose dot among the reference vowels; the faint trail shows your recent attempts (a dot every <span id="howtoInterval">0.1</span>&nbsp;s) — a tight cluster means you are consistent.</li>
       <li>Try <b>“ah” → “mmm”</b>: the soft palate (velum) lowers and the velopharyngeal port opens on the nasal sound, then closes again for the oral vowel. Watch the <b>Nasality (velum)</b> meter.</li>
+      <li>With the <b>camera</b> on, try <b>“thh” (as in <i>thin</i>, <i>this</i>)</b>: the tongue tip becomes visible between the teeth and a rose marker appears on the drawn tongue tip (<b>Tongue tip</b> readout: <i>visible · dental</i>). Honest limitation: a single front camera only sees the tip when it enters the lip aperture — for /l, ɹ, n/ the tip stays behind the teeth and is mostly occluded, so the acoustic tracker remains authoritative and the marker simply fades.</li>
       <li>Hit <b>▶ Play back</b> to hear the last 3 seconds of your voice and compare it to the target sound.</li>
     </ol>
   </div>
@@ -193,19 +195,22 @@
 /* =======================================================================
  * Reference data — Hillenbrand, Getty, Clark & Wheeler (1995).
  * "Acoustic characteristics of American English vowels", JASA 97:3099–3111.
- * Mean F1/F2 (Hz) for men (45) and women (48), /hVd/ context.
+ * Mean F1/F2 (Hz) for men (45) and women (48), /hVd/ context. Mean F3/F4 and the
+ * within-vowel SDs `sd = [σF1, σF2, σF3, σF4]` are from the Hillenbrand archive
+ * (vowdata.ds) — see articulation-acoustics.md §8. The SDs feed the F2/F3/F4
+ * z-scores (§4.2 there); the pose blend uses only the means.
  * ===================================================================== */
 const VOWELS = [
-  { ipa: "i",  word: "heed",  m: { f1: 342, f2: 2322 }, w: { f1: 437, f2: 2761 } },
-  { ipa: "ɪ",  word: "hid",   m: { f1: 427, f2: 2034 }, w: { f1: 483, f2: 2365 } },
-  { ipa: "ɛ",  word: "head",  m: { f1: 580, f2: 1799 }, w: { f1: 731, f2: 2058 } },
-  { ipa: "æ",  word: "had",   m: { f1: 588, f2: 1952 }, w: { f1: 669, f2: 2349 } },
-  { ipa: "ɑ",  word: "hod",   m: { f1: 768, f2: 1333 }, w: { f1: 936, f2: 1551 } },
-  { ipa: "ɔ",  word: "hawed", m: { f1: 652, f2: 997  }, w: { f1: 781, f2: 1136 } },
-  { ipa: "ʊ",  word: "hood",  m: { f1: 469, f2: 1122 }, w: { f1: 519, f2: 1225 } },
-  { ipa: "u",  word: "who'd", m: { f1: 378, f2: 997  }, w: { f1: 459, f2: 1105 } },
-  { ipa: "ʌ",  word: "hud",   m: { f1: 623, f2: 1200 }, w: { f1: 753, f2: 1426 } },
-  { ipa: "ɝ",  word: "heard", m: { f1: 474, f2: 1379 }, w: { f1: 586, f2: 1718 } },
+  { ipa: "i",  word: "heed",  m: { f1: 342, f2: 2322, f3: 3001, f4: 3658, sd: [28, 136, 201, 218] }, w: { f1: 437, f2: 2761, f3: 3373, f4: 4353, sd: [41, 147, 237, 420] } },
+  { ipa: "ɪ",  word: "hid",   m: { f1: 427, f2: 2034, f3: 2687, f4: 3628, sd: [31, 122, 129, 207] }, w: { f1: 483, f2: 2365, f3: 3057, f4: 4333, sd: [34, 149, 190, 303] } },
+  { ipa: "ɛ",  word: "head",  m: { f1: 580, f2: 1799, f3: 2604, f4: 3699, sd: [41, 117, 139, 256] }, w: { f1: 731, f2: 2058, f3: 2953, f4: 4312, sd: [74, 143, 189, 384] } },
+  { ipa: "æ",  word: "had",   m: { f1: 588, f2: 1952, f3: 2595, f4: 3642, sd: [42, 133, 137, 292] }, w: { f1: 669, f2: 2349, f3: 2973, f4: 4315, sd: [69, 159, 200, 368] } },
+  { ipa: "ɑ",  word: "hod",   m: { f1: 768, f2: 1333, f3: 2535, f4: 3684, sd: [62, 111, 149, 265] }, w: { f1: 936, f2: 1551, f3: 2832, f4: 4291, sd: [97, 125, 177, 401] } },
+  { ipa: "ɔ",  word: "hawed", m: { f1: 652, f2: 997,  f3: 2521, f4: 3520, sd: [34, 66, 179, 214] }, w: { f1: 781, f2: 1136, f3: 2824, f4: 3946, sd: [75, 129, 212, 250] } },
+  { ipa: "ʊ",  word: "hood",  m: { f1: 469, f2: 1122, f3: 2435, f4: 3401, sd: [28, 97, 127, 227] }, w: { f1: 519, f2: 1225, f3: 2829, f4: 4061, sd: [41, 145, 183, 244] } },
+  { ipa: "u",  word: "who'd", m: { f1: 378, f2: 997,  f3: 2355, f4: 3378, sd: [33, 113, 133, 294] }, w: { f1: 459, f2: 1105, f3: 2735, f4: 4116, sd: [39, 205, 140, 335] } },
+  { ipa: "ʌ",  word: "hud",   m: { f1: 623, f2: 1200, f3: 2548, f4: 3564, sd: [30, 87, 142, 212] }, w: { f1: 753, f2: 1426, f3: 2901, f4: 4133, sd: [58, 115, 173, 283] } },
+  { ipa: "ɝ",  word: "heard", m: { f1: 474, f2: 1379, f3: 1711, f4: 3335, sd: [29, 78, 108, 279] }, w: { f1: 586, f2: 1718, f3: 1930, f4: 3914, sd: [45, 126, 131, 367] } },
 ];
 
 /* ======================= Tunable constants ======================= */
@@ -255,15 +260,15 @@ let stream = null;
 let running = false;
 let fs2 = 16000;                  // decimated sample rate (set on start)
 let decimator = null, decOut = null;
-let dotIntervalMs = 1500;
-let dotTimer = null;
+let dotIntervalMs = 100;             // fastest useful rate: analysis frames arrive
+let dotTimer = null;                 // every ~43 ms, the readout throttles at 80 ms
 
 let recBuf = null, recPos = 0, recFilled = false;   // recording ring buffer
 let isPlayingBack = false;
 
 let userDots = [];                // {f1, f2}
 let recentPoints = [];            // {f1, f2} since last dot
-let latest = null;                // {f1, f2} of most recent stable voiced frame
+let latest = null;                // {f1, f2, f3} of most recent stable voiced frame
 let lastReadoutUpdate = 0;
 let lastVoicedAt = 0;             // timestamp of last voiced frame (for tongue fade)
 
@@ -280,7 +285,7 @@ const tongueTracker = {
     if (this.rejectRun > TRACK_MAX_REJECTS) this.reset();  // allow re-acquire
     return null;
   },
-  push(f1, f2, now) {
+  push(f1, f2, now, f3, f4) {
     const plausible = f1 >= TRACK_F1_MIN && f1 <= TRACK_F1_MAX &&
                       f2 >= TRACK_F2_MIN && f2 <= TRACK_F2_MAX &&
                       f2 >= f1 + TRACK_MIN_GAP;
@@ -294,15 +299,23 @@ const tongueTracker = {
       if (jump > TRACK_JUMP_HZ) return this.reject();
     }
 
-    this.raw.push({ f1, f2 });
+    this.raw.push({ f1, f2, f3: f3 != null ? f3 : null, f4: f4 != null ? f4 : null });
     if (this.raw.length > 3) this.raw.shift();
     this.lastRaw = { f1, f2 };
     this.lastRawAt = now;
     this.rejectRun = 0;
 
+    // F3/F4 are only present on some frames (weak upper poles): median over
+    // the frames that have them, null when none do.
+    const med = (k) => {
+      const xs = this.raw.map(p => p[k]).filter(x => x != null);
+      return xs.length ? median(xs) : null;
+    };
     return {
       f1: median(this.raw.map(p => p.f1)),
-      f2: median(this.raw.map(p => p.f2))
+      f2: median(this.raw.map(p => p.f2)),
+      f3: med("f3"),
+      f4: med("f4")
     };
   }
 };
@@ -531,7 +544,7 @@ function formantsFromRoots(n, fs) {
     { fMin: 60,  fMax: 4200, rMin: 0.00, bwMax: Infinity }, // D: last resort
   ];
 
-  let f1 = null, f2 = null;
+  let f1 = null, f2 = null, p1 = null, p2 = null;
   for (const tier of tiers) {
     const fm = poles.filter(p =>
       p.freq >= tier.fMin && p.freq <= tier.fMax &&
@@ -539,28 +552,53 @@ function formantsFromRoots(n, fs) {
     );
     if (fm.length < 2) continue;
     // Assign F1 = lowest pole, F2 = first pole ≥ F1 + 100 Hz.
-    f1 = fm[0].freq;
+    p1 = fm[0];
+    f1 = p1.freq;
     for (let i = 1; i < fm.length; i++) {
-      if (fm[i].freq >= f1 + 100) { f2 = fm[i].freq; break; }
+      if (fm[i].freq >= f1 + 100) { p2 = fm[i]; f2 = p2.freq; break; }
     }
     if (f2 !== null) break;  // got both — done
   }
 
-  // Fallback: if no tier gave us two poles, try single-pole (F1 only).
+  // Fallback: if no tier gave us two poles, try the unfiltered pool (F1 only).
   if (f1 === null) {
     // Use the loosest tier's filter to grab whatever we can.
     const fm = poles.filter(p =>
       p.freq >= 60 && p.freq <= 4200
     );
     if (fm.length === 0) return null;
-    f1 = fm[0].freq;
+    p1 = fm[0];
+    f1 = p1.freq;
     for (let i = 1; i < fm.length; i++) {
-      if (fm[i].freq >= f1 + 100) { f2 = fm[i].freq; break; }
+      if (fm[i].freq >= f1 + 100) { p2 = fm[i]; f2 = p2.freq; break; }
     }
   }
 
-  if (f1 === null) return null;
-  return { f1, f2: f2 !== null ? f2 : f1 + 200 };  // last resort: synthetic F2
+  if (f1 === null || f2 === null) return null;   // need both — never invent an F2
+  // (An earlier last resort returned a synthetic F2 = F1 + 200 Hz. It
+  // fabricated an extreme back/rounded tongue whenever the F2 pole was
+  // missed — most often on /u/, whose F2 is weak and close to F1. The
+  // caller now rejects the frame and holds the last good tongue instead.)
+
+  // F3/F4 — relaxed pole pool (articulation-acoustics.md §3.2): the first pole
+  // ≥ F2 + 150 Hz, then the first ≥ F3 + 150 Hz. A missing or very broad pole
+  // is reported as null, never guessed. F4 feeds the protrusion index only.
+  const pickAbove = (minHz) => {
+    for (const pole of poles) {
+      if (pole.freq < minHz || pole.freq > 5000) continue;
+      if (pole.radius < 0.50 || pole.bw > 600) continue;
+      return pole;
+    }
+    return null;
+  };
+  const p3 = pickAbove(f2 + 150);
+  const p4 = p3 ? pickAbove(p3.freq + 150) : null;
+  return {
+    f1, f2,
+    f3: p3 ? p3.freq : null, bw3: p3 ? p3.bw : null,
+    f4: p4 ? p4.freq : null, bw4: p4 ? p4.bw : null,
+    bw1: p1.bw, bw2: p2.bw
+  };
 }
 
 /* ======================= Acoustic nasality (velum) =======================
@@ -587,7 +625,7 @@ function formantsFromRoots(n, fs) {
    This is an *estimate*, not a clinical nasalance meter: it assumes a voiced
    sustained sound and is deliberately smoothed before it moves the artwork.
    Exposed via window.__vt.nasalDbg(). */
-function nasalityFromLpc(fs, f1) {
+function nasalityFromLpc(fs, f1, bw1) {
   const a = lpcA, pp = p, pre = PREEMPH;
   const k = 2 * Math.PI / fs;
   const c0 = 1 + pre * pre;
@@ -620,8 +658,32 @@ function nasalityFromLpc(fs, f1) {
   // steep drop. Penalise the latter so /i/ and /u/ don't read as nasal.
   const sharp = Math.max(0, p0 - sub);
   const score = 1.5 * p0 - 0.5 * a1 - valley - 0.3 * sharp;
-  const value = clamp((score - 8) / 24, 0, 1);
-  return { value, score, sharp, a1p0: a1 - p0, p0, a1, valley, sub };
+  /* Height guard (Nov 2026): for close vowels F1 ITSELF fills the 180–330 Hz
+     band, so any smooth low-frequency boost (mic proximity effect, bass-heavy
+     headsets, wide/breathy F1) masquerades as a nasal pole — measured false
+     "open port" on oral /i/, /u/ was ~17 % before this term. A real nasal
+     coupling shows as a DISTINCT pole (prominence over the 120–180 Hz shoulder)
+     or as a clearly BROAD merged pole (LPC F1 bandwidth ≫ oral F1). Require one
+     of those before a high vowel may read "open"; low vowels (F1 well above the
+     band, where the pole is unambiguous) keep the unguarded score. Cost: weak,
+     fully-merged nasalisation of high vowels may read closed — that case is
+     genuinely ambiguous acoustically (nasalance meters struggle with it too). */
+  const prom = p0 - sub;
+  const distinct = clamp((prom - 2.5) / 2.5, 0, 1) * clamp((bw1 - 85) / 55, 0, 1);
+  const murmurShape = clamp((330 - f1) / 60, 0, 1) * clamp((bw1 - 110) / 60, 0, 1);
+  const highPen = clamp((480 - f1) / 120, 0, 1);
+  /* Shelf guard (Nov 2026): a mic proximity/bass shelf lifts the whole 120–330 Hz
+     region with NO pole prominence (prom ≤ 0) while leaving the F1 peak relatively
+     untouched — so P0 can exceed A1 and the raw score drifts to "partly open" even
+     for oral /ɑ/ (measured 0.20–0.28 with a steep voice tilt). A genuine nasal
+     coupling is a LOCAL pole (prom > 0). Penalise the shelf signature only. */
+  const shelfPen = clamp(-prom / 2, 0, 1) * clamp((p0 - a1) / 5, 0, 1) * 14;
+  const scoreG = score + 16 * murmurShape
+               - highPen * (1 - Math.max(distinct, murmurShape)) * 14
+               - shelfPen;
+  const value = clamp((scoreG - 8) / 24, 0, 1);
+  return { value, score: scoreG, sharp, a1p0: a1 - p0, p0, a1, valley, sub,
+           prom, bw1, highPen };
 }
 
 /* Analyze one decimated frame; returns {f1, f2} or null if not a
@@ -723,27 +785,33 @@ function analyzeFrame(x, n, fs) {
   for (let i = 1; i <= p; i++) poly[p - i] = -lpcA[i];
   lpcRoots(p);
   const res = formantsFromRoots(p, fs);
-  voiceDbg.formants = res ? [res.f1, res.f2] : null;
-  if (!res || res.f2 == null) return null;      // need both F1 and F2
+  voiceDbg.formants = res ? [res.f1, res.f2, res.f3, res.f4] : null;
+  if (!res) return null;
 
   // 7) nasality from the same LPC coefficients (no extra FFT needed)
-  const nas = nasalityFromLpc(fs, res.f1);
+  const nas = nasalityFromLpc(fs, res.f1, res.bw1);
   nasalDbg = { value: nas.value, score: nas.score, sharp: nas.sharp,
                a1p0: nas.a1p0, p0: nas.p0, a1: nas.a1,
-               valley: nas.valley, sub: nas.sub, f1: res.f1, f0 };
+               valley: nas.valley, sub: nas.sub, f1: res.f1, f0,
+               prom: nas.prom, bw1: nas.bw1, highPen: nas.highPen };
   voiceDbg.nasal = nas.value;
-  return { f1: res.f1, f2: res.f2, f0, pitch: conf, rms, zcr, nasal: nas.value };
+  return { f1: res.f1, f2: res.f2, f3: res.f3, f4: res.f4, f0, pitch: conf, rms, zcr, nasal: nas.value };
 }
 
 /* ======================= Nearest reference vowel ======================= */
-function nearestVowel(f1, f2) {
-  let best = null, bestD = Infinity;
+/* Nearest reference vowel: classified in the same whitened space as the
+   posture blend, but the reported distance stays in plain F1/F2 Hz because
+   the UI thresholds (< 120 good, < 260 warn) are calibrated in Hz. */
+function nearestVowel(f1, f2, f3, lip) {
+  const d0 = formantDims(f1, f2, f3), sd = getDimScale(gender);
+  let best = null, bestD = Infinity, bestHz = 0;
   for (const v of VOWELS) {
     const ref = gender === "m" ? v.m : v.w;
-    const d = Math.hypot(f1 - ref.f1, f2 - ref.f2);
-    if (d < bestD) { bestD = d; best = v; }
+    const d = formantDist(d0, formantDims(...refFormants(ref, v.ipa, lip)), sd);
+    const dHz = Math.hypot(f1 - ref.f1, f2 - ref.f2);
+    if (d < bestD) { bestD = d; best = v; bestHz = dHz; }
   }
-  return { vowel: best, dist: bestD };
+  return { vowel: best, dist: bestHz };
 }
 function median(arr) {
   if (!arr.length) return null;
@@ -1186,18 +1254,82 @@ const VOWEL_POSE = {
    behind it with rounded lips (/ʃ/-like). */
 const S_POSE  = { jaw: 2.4, cx: 3.45, cy: 0.85, tx: 0.95, ty: -1.52, gap: 0.42, prot: -0.04 };
 const SH_POSE = { jaw: 2.6, cx: 3.40, cy: 0.62, tx: 1.55, ty: -1.9, gap: 0.42, prot: 0.32 };
+/* /θ, ð/ — tongue tip between the incisors: tip forward of the alveolar contact
+   (small tx = forward in the face-left midsagittal frame), only slightly raised,
+   teeth parted. Used when the quiet dental-frication cue and the camera tip
+   visibility agree. */
+const TH_POSE = { jaw: 2.8, cx: 3.55, cy: 0.95, tx: 0.52, ty: -0.75, gap: 0.85, prot: 0.05 };
 
-/* (F1, F2) → posture: inverse-distance blend of the vowel prototypes in
-   Bark space, so the posture is exact at every reference vowel and changes
-   smoothly in between. */
-function poseFromFormants(f1, f2) {
-  const b1 = toBark(f1), b2 = toBark(f2);
+/* (F1, F2, F3) → posture: inverse-distance blend of the vowel prototypes in
+   a whitened acoustic space. The dimensions are height = Bark(F1) and
+   backness = Bark(F2) − Bark(F1) (Syrdal & Gopal 1986), plus Bark(F3) at
+   reduced weight: F3 carries lip rounding and tongue-tip state as well as
+   vowel identity, so it is supporting evidence for the tongue, not one of
+   its axes. Each dimension is scaled by its spread across the reference
+   vowels, so no axis dominates just because Bark Hz are its raw unit —
+   without this, /u/ and /ʊ/ tie at a less-rounded /u/ (F2 ≈ 1100) and the
+   tongue is drawn halfway between the two. F3 may be null (weak third
+   pole): the blend then degrades to (F1, F2). The posture is exact at
+   every reference vowel and changes smoothly in between. */
+const F3_W = 0.4;
+function formantDims(f1, f2, f3) {
+  const b1 = toBark(f1);
+  return { h: b1, b: toBark(f2) - b1, r: f3 != null ? toBark(f3) : null };
+}
+const dimScale = { m: null, w: null };
+function getDimScale(g) {
+  if (!dimScale[g]) {
+    const rows = VOWELS.map(v => formantDims(v[g].f1, v[g].f2, v[g].f3));
+    const sd = (k) => {
+      const vals = rows.map(d => d[k]);
+      const mu = vals.reduce((s, x) => s + x, 0) / vals.length;
+      return Math.sqrt(vals.reduce((s, x) => s + (x - mu) * (x - mu), 0) / vals.length) || 1;
+    };
+    dimScale[g] = { h: sd("h"), b: sd("b"), r: sd("r") };
+  }
+  return dimScale[g];
+}
+function formantDist(d0, d, sd) {
+  let dd = Math.pow((d0.h - d.h) / sd.h, 2) + Math.pow((d0.b - d.b) / sd.b, 2);
+  if (d0.r != null && d.r != null) dd += Math.pow(F3_W * (d0.r - d.r) / sd.r, 2);
+  return Math.sqrt(dd);
+}
+/* Typical lip rounding of each prototype posture, derived from its protrusion
+   value: the hand-set `prot` values already order the vowels spread → rounded.
+   /ɝ/ is pinned at neutral — its posture is r-colouring, not rounding. */
+const VOWEL_ROUND = {};
+for (const vk of Object.keys(VOWEL_POSE)) {
+  VOWEL_ROUND[vk] = vk === "ɝ" ? 0.5 : clamp(0.5 + 1.2 * VOWEL_POSE[vk].prot, 0, 1);
+}
+/* Lip-rounding correction for camera fusion (articulation-acoustics.md §4.1):
+   rounding lowers F1/F2/F3, strongest on F2. When the speaker's lip posture is
+   measured, each prototype's reference formants are forward-modelled to that lip
+   posture before the distance computation, so the tongue mapping responds only
+   to what the *tongue* did to the formants. κ = fractional formant change across
+   the full spread → rounded range (≈15 % on F2, Fant 1969; Lindau 1978). */
+const LIP_K1 = 0.05, LIP_K2 = 0.15, LIP_K3 = 0.10;
+function refFormants(ref, ipa, lip) {
+  if (!lip || !isFinite(lip.round) || !isFinite(lip.spread)) return [ref.f1, ref.f2, ref.f3];
+  const dR = clamp(0.5 + (lip.round - lip.spread), 0, 1) - VOWEL_ROUND[ipa];
+  return [ref.f1 * (1 - LIP_K1 * dR), ref.f2 * (1 - LIP_K2 * dR),
+          ipa === "ɝ" ? ref.f3 : ref.f3 * (1 - LIP_K3 * dR)];  // /ɝ/: F3 is r-colouring
+}
+/* The measured lip state used for fusion: test hook first, then the camera. */
+function fusionLip() {
+  return lipForced || (camOn && camLandmarks ? camLip : null);
+}
+/* The measured tongue-tip state used for fusion: test hook first, then camera. */
+function fusionTongue() {
+  return tongueForced || (camOn && camTongue ? camTongue : null);
+}
+function poseFromFormants(f1, f2, f3, lip) {
+  const d0 = formantDims(f1, f2, f3), sd = getDimScale(gender);
   const out = {}; let wsum = 0;
   for (const k of POSE_KEYS) out[k] = 0;
   for (const v of VOWELS) {
     const ref = gender === "m" ? v.m : v.w;
-    const d = Math.hypot(b1 - toBark(ref.f1), b2 - toBark(ref.f2));
-    const w = 1 / (d * d * d + 0.03);
+    const d = formantDist(d0, formantDims(...refFormants(ref, v.ipa, lip)), sd);
+    const w = 1 / (d * d * d + 0.01);   // floor rescaled for whitened distances
     const ps = VOWEL_POSE[v.ipa];
     for (const k of POSE_KEYS) out[k] += w * ps[k];
     wsum += w;
@@ -1219,7 +1351,15 @@ let targetVowel = null;                // user-selected target (null = auto / ne
 let showLabels = true;
 let lastFricAt = 0, fricSharp = 0;     // sibilant detector output
 let noiseFloor = 0.002;                // slow minimum-tracker of the input RMS
-let camLip = null;                     // {gap, prot} from the camera, when on
+let camLip = null;                     // {gap, prot, round, spread} from the camera
+let lipForced = null;                  // ?lip= / __vt.setLip() test override
+let camTongue = null;                  // smoothed {vis, tip, prot, pt} from mouth-aperture pixels
+let camTongueRaw = null, camTickN = 0;
+let tongueForced = null;               // ?tongue= / __vt.setTongueTip() test override
+let lastDentalAt = 0;                  // quiet dental-frication (/θ, ð/) detector timestamp
+/* Per-face neutral baseline for the lip derives (mirrors lip-lab.html's
+   "Set neutral"): captured automatically from the first relaxed frames. */
+let camNeutral = null, camNeutralAcc = null;
 let fricAmp = 0;                       // 0..1 — how strongly frication is shown
 
 /* Sibilant frication = loud + noise-like (high zero-crossing rate) while the
@@ -1232,13 +1372,34 @@ function fricationCue(d) {
   return clamp((d.zcr - 0.42) / 0.2, 0, 1);       // 0 = /ʃ/-like, 1 = /s/-like
 }
 
+/* Quiet dental frication (/θ/, /ð/): weak, low-centroid noise. Sibilants are
+   LOUD with high zero-crossing rates (/s/ ~6.5 kHz, /ʃ/ ~3 kHz → zcr ≥ 0.34);
+   dental frication is quiet and diffuse (centroid a few kHz lower), so it lands
+   below the sibilant ZCR band yet above the silence floor. Deliberately a
+   simple heuristic — it only claims /θ, ð/ jointly with the camera seeing the
+   tongue tip at the teeth (see updateTongueCues). */
+function dentalCue(d) {
+  if (!d || d.zcr == null || d.rms == null) return null;
+  if (d.zcr < 0.10 || d.zcr >= FRIC_ZCR_MIN) return null;
+  const floor = Math.max(0.0035, 2.5 * noiseFloor);
+  if (d.rms < floor || d.rms >= FRIC_RMS_MIN) return null;
+  return clamp((FRIC_ZCR_MIN - d.zcr) / 0.15, 0, 1)
+       * clamp((d.rms - floor) / (FRIC_RMS_MIN - floor), 0, 1);
+}
+
 function updateArticulation(now) {
   const dt = clamp((now - (artLastT || now)) / 1000, 0, 0.1);
   artLastT = now;
   const voiced = !!latest && (now - lastVoicedAt < 160);
+  // Joint dental cue: quiet low-centroid frication AND the camera seeing the
+  // tongue tip at the teeth. Without the camera the acoustic tracker stays
+  // authoritative and no dental claim is made.
+  const tt0 = fusionTongue();
+  const dentalNow = now - lastDentalAt < 180 && !!tt0 && tt0.vis > 0.35;
   let tgt = null, tau = 0.07;
   if (poseForced) { tgt = poseForced; artMode = "forced"; }
-  else if (voiced) { tgt = poseFromFormants(latest.f1, latest.f2); artMode = "vowel"; }
+  else if (dentalNow) { tgt = TH_POSE; tau = 0.05; artMode = "fric"; }
+  else if (voiced) { tgt = poseFromFormants(latest.f1, latest.f2, latest.f3, fusionLip()); artMode = "vowel"; }
   else if (now - lastFricAt < 110) { tgt = blendPose(SH_POSE, S_POSE, fricSharp); tau = 0.05; artMode = "fric"; }
   else if (!running && targetVowel) { tgt = VOWEL_POSE[targetVowel]; tau = 0.12; artMode = "demo"; }
   else if (Math.max(lastVoicedAt, lastFricAt) > 0 && now - Math.max(lastVoicedAt, lastFricAt) < 320) { artMode = "hold"; }
@@ -1254,6 +1415,22 @@ function updateArticulation(now) {
     } else if (camOn && camLandmarks) {
       tgt = { ...tgt, jaw: 1 + 11 * clamp(camJaw / 0.7, 0, 1) };
       if (camLip) { tgt.gap = camLip.gap; tgt.prot = camLip.prot; }
+    }
+    if (lipForced) {
+      if (lipForced.gap != null) tgt.gap = lipForced.gap;
+      if (lipForced.prot != null) tgt.prot = lipForced.prot;
+    }
+    // Camera tongue-tip fusion: when the tip is visible in the lip aperture,
+    // pull the drawn tip toward the measured protrusion/height. A tip that is
+    // occluded behind the teeth (/l, ɹ, n/) leaves the acoustic posture alone.
+    const tt = artMode === "forced" ? null : fusionTongue();
+    if (tt && tt.vis > 0.25) {
+      const v = clamp((tt.vis - 0.25) / 0.5, 0, 1);
+      tgt = {
+        ...tgt,
+        tx: lerp(tgt.tx, 0.48, 0.55 * v * clamp(tt.prot, 0, 1)),   // small tx = forward
+        ty: lerp(tgt.ty, -1.15, 0.55 * v * clamp(tt.tip, 0, 1)),   // negative ty = raised
+      };
     }
     const k = 1 - Math.exp(-dt / tau);
     for (const key of POSE_KEYS) art[key] += (tgt[key] - art[key]) * k;
@@ -1340,6 +1517,7 @@ function buildFrame(st, vel) {
   // ---- tongue ----
   const R = TONGUE_R, C = [st.cx, st.cy];
   const tip = inside(J([st.tx, st.ty]));
+  F.tipPt = tip;                    // drawn tongue tip (camera marker anchor)
   // sublingual fold (frenulum): a little behind the tip, further back when
   // the tip is raised, so the underside of the blade slopes down and back
   const A0 = J([clamp(st.tx + 0.42 + 0.3 * clamp(-st.ty, 0, 2), 1.05, 2.2), 1.22]);
@@ -1641,6 +1819,23 @@ function drawAnatomy(F) {
   ctx.lineWidth = 1.9 * PX;
   ctx.stroke(F.tongueLine);
 
+  // Camera-confirmed tongue-tip marker: a rose ring on the drawn tip (filled
+  // with a “th” tag when the joint dental cue fires). Fades out when the tip
+  // is occluded behind the teeth — the acoustic posture then stands alone.
+  const ttMark = fusionTongue();
+  if (ttMark && ttMark.vis > 0.25 && F.tipPt) {
+    const q = F.tipPt, rr = 0.14 + 0.12 * ttMark.vis;
+    ctx.beginPath(); ctx.arc(q[0], q[1], rr, 0, 2 * Math.PI);
+    ctx.fillStyle = tongueCue.dental ? "rgba(251,113,133,.85)" : "rgba(251,113,133,.35)";
+    ctx.fill();
+    ctx.strokeStyle = "rgba(255,255,255,.9)"; ctx.lineWidth = 1.2 * PX; ctx.stroke();
+    if (tongueCue.dental) {
+      ctx.fillStyle = "#7c2d3c"; ctx.font = (3.2 * PX) + "px sans-serif";
+      ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.fillText("th", q[0], q[1] - rr - 0.42);
+    }
+  }
+
   // 10 — epiglottis (elastic cartilage under mucosa)
   paint(F.epi, "#f3b7a6", PAL.velumLine, 1.3);
   ctx.strokeStyle = "rgba(255,246,222,.85)"; ctx.lineWidth = 2.4 * PX; ctx.stroke(F.epiCore);
@@ -1756,7 +1951,7 @@ function ghostFor(ipa) {
 }
 function currentTarget(now) {
   if (targetVowel) return targetVowel;
-  if (latest && now - lastVoicedAt < 400) return nearestVowel(latest.f1, latest.f2).vowel.ipa;
+  if (latest && now - lastVoicedAt < 400) return nearestVowel(latest.f1, latest.f2, latest.f3, fusionLip()).vowel.ipa;
   return null;
 }
 function drawTargetGhost(now) {
@@ -2029,6 +2224,77 @@ function updateNasality(now) {
   }
 }
 
+/* ======================= Lip cue badges (F2/F3/F4 z-scores) =======================
+   Rounding and protrusion are the part of the formant pattern that F1/F2 cannot
+   separate from tongue backing (articulation-acoustics.md §4.2). Both indices are
+   vowel-conditioned z-scores against the Hillenbrand within-vowel SDs:
+
+     R = clamp(0.5 − (0.7·zF3 + 0.3·zF2) / 3, 0, 1)      rounding
+     P = clamp(0.5 − mean(zF2, zF3, zF4) / 3, 0, 1)      protrusion (low confidence)
+
+   Low formants = rounded / protruded. For /ɝ/ the zF3 term is dropped (its low
+   F3 is r-colouring, not lips). Display values are a 5-frame median and the
+   categorical labels use ±0.10 hysteresis around the 0.65/0.35 boundaries so
+   they do not flicker (§9). Read-outs only — never fed back into the tongue. */
+const lipCue = { r: null, p: null, rLabel: "—", pLabel: "—", hist: [] };
+const tongueCue = { vis: null, tip: null, prot: null, label: "—", dental: false, hist: [] };
+function cueLabel(cur, v, hi, lo) {
+  if (cur === hi && v > 0.55) return hi;
+  if (cur === lo && v < 0.45) return lo;
+  if (v > 0.65) return hi;
+  if (v < 0.35) return lo;
+  return "neutral";
+}
+function updateLipCues() {
+  const voiced = !!latest && (performance.now() - lastVoicedAt < 400);
+  if (!voiced || !latest) {
+    lipCue.hist = [];
+    return;
+  }
+  const { vowel } = nearestVowel(latest.f1, latest.f2, latest.f3, fusionLip());
+  if (!vowel) return;
+  const ref = gender === "m" ? vowel.m : vowel.w;
+  const z = (x, i) => (x != null && ref.sd[i - 1] > 0
+    ? clamp((x - ref[["", "f1", "f2", "f3", "f4"][i]]) / ref.sd[i - 1], -4, 4) : null);
+  const z2 = z(latest.f2, 2);
+  const z3 = vowel.ipa === "ɝ" ? null : z(latest.f3, 3);   // r-colouring ≠ lips
+  const z4 = z(latest.f4, 4);
+  const r = clamp(0.5 - (0.7 * (z3 != null ? z3 : 0) + 0.3 * z2) / 3, 0, 1);
+  const zs = [z2, z3, z4].filter(x => x != null);
+  const p = zs.length ? clamp(0.5 - (zs.reduce((s, x) => s + x, 0) / zs.length) / 3, 0, 1) : 0.5;
+  lipCue.hist.push({ r, p });
+  if (lipCue.hist.length > 5) lipCue.hist.shift();
+  const mr = median(lipCue.hist.map(h => h.r)), mp = median(lipCue.hist.map(h => h.p));
+  lipCue.r = mr; lipCue.p = mp;
+  lipCue.rLabel = cueLabel(lipCue.rLabel, mr, "rounded", "spread");
+  lipCue.pLabel = cueLabel(lipCue.pLabel, mp, "protruded", "retracted");
+}
+
+/* Camera tongue-tip cue: 5-frame median like the lip cues. `dental` is the
+   joint claim — quiet low-centroid frication (θ/ð-like) WITH the tip visible
+   at the teeth. Without the camera no dental claim is ever made. */
+function updateTongueCues() {
+  const t = fusionTongue();
+  const dental = performance.now() - lastDentalAt < 180 && !!t && t.vis > 0.35;
+  tongueCue.dental = dental;
+  if (!t || t.vis <= 0.05) {
+    tongueCue.hist = [];
+    tongueCue.vis = t ? t.vis : null;
+    tongueCue.tip = tongueCue.prot = null;
+    tongueCue.label = dental ? "possible · th (acoustic only)"
+      : camOn ? "occluded / hidden" : "—";
+    return;
+  }
+  tongueCue.hist.push({ v: t.vis, h: t.tip, p: t.prot });
+  if (tongueCue.hist.length > 5) tongueCue.hist.shift();
+  const med = (k) => median(tongueCue.hist.map(h => h[k]));
+  tongueCue.vis = med("v"); tongueCue.tip = med("h"); tongueCue.prot = med("p");
+  tongueCue.label = dental ? "visible · dental (th)"
+    : tongueCue.vis > 0.45 ? "visible · tip " + (tongueCue.tip > 0.6 ? "high"
+      : tongueCue.tip > 0.3 ? "mid" : "low")
+    : "barely visible";
+}
+
 /* Jaw + lips read-outs come from the drawn articulatory state. */
 let artLastUi = 0;
 function updateArtReadout(now) {
@@ -2043,19 +2309,30 @@ function updateArtReadout(now) {
   $("jawBar").style.width = jawPct + "%";
   $("jawState").textContent = jawForced != null ? "forced (test)"
     : cam ? "measured · camera" : (why || "inferred from the vowel");
-  $("lipVal").textContent = lipState();
-  $("lipState").textContent = cam && camLip ? "measured · camera" : (why || "typical for this vowel");
+  const lipMeasured = cam && camLip;
+  const badge = why == null && lipCue.r != null;
+  $("lipVal").textContent = lipMeasured ? lipState()
+    : badge ? lipCue.rLabel + (lipCue.pLabel !== "neutral" ? ", " + lipCue.pLabel : "")
+    : lipState();
+  $("lipState").textContent = lipMeasured ? "measured · camera"
+    : badge ? "inferred · F2–F4 z-scores (R " + lipCue.r.toFixed(2) + " · P " + lipCue.p.toFixed(2) + ")"
+    : (why || "typical for this vowel");
+  const tt = fusionTongue();
+  $("tipVal").textContent = tongueCue.dental ? "dental (th)"
+    : tongueCue.vis != null ? Math.round(100 * tongueCue.vis) + "%" : "—";
+  $("tipState").textContent = tongueForced != null ? "forced (test) · " + tongueCue.label
+    : camOn ? tongueCue.label + " · camera" : "camera off · acoustic only";
 }
 
 /* ======================= Live readout ======================= */
-function updateReadout(f1, f2, f0, now) {
+function updateReadout(f1, f2, f0, now, f3) {
   if (now - lastReadoutUpdate < 80) return;   // throttle
   lastReadoutUpdate = now;
   $("f1").textContent = Math.round(f1);
   $("f2").textContent = Math.round(f2);
   $("f0").textContent = Number.isFinite(f0) && f0 > 0 ? Math.round(f0) : "—";
   $("voiceState").textContent = "voiced";
-  const { vowel, dist } = nearestVowel(f1, f2);
+  const { vowel, dist } = nearestVowel(f1, f2, f3, fusionLip());
   const st = $("status");
   if (vowel) {
     $("nearest").textContent = "/" + vowel.ipa + "/";
@@ -2133,15 +2410,20 @@ function onAudioProcess(e) {
   if (!res) {
     const fric = fricationCue(voiceDbg);
     if (fric != null) { lastFricAt = now; fricSharp += (fric - fricSharp) * 0.5; }
+    // Quiet low-centroid frication (θ/ð-like): timestamp the dental detector.
+    // The /θ, ð/ claim itself is JOINT — it only fires while the camera also
+    // sees the tongue tip at the teeth (updateTongueCues / updateArticulation);
+    // without a tip measurement this timestamp alone claims nothing.
+    if (dentalCue(voiceDbg) != null) lastDentalAt = now;
   }
 
   if (res) {
     lastVoicedAt = now;
-    const stable = tongueTracker.push(res.f1, res.f2, now);
+    const stable = tongueTracker.push(res.f1, res.f2, now, res.f3, res.f4);
     if (stable) {
-      latest = { ...res, f1: stable.f1, f2: stable.f2 };
+      latest = { ...res, f1: stable.f1, f2: stable.f2, f3: stable.f3, f4: stable.f4 };
       recentPoints.push({ f1: stable.f1, f2: stable.f2 });
-      updateReadout(stable.f1, stable.f2, res.f0, now);
+      updateReadout(stable.f1, stable.f2, res.f0, now, stable.f3);
     } else {
       // Voiced, but the formants were rejected: keep the last good tongue,
       // still show that the folds are vibrating.
@@ -2353,11 +2635,58 @@ function camStop() {
   camJawRaw = 0;
   camLandmarks = null;
   camLipRaw = null;
+  camNeutral = null;
+  camNeutralAcc = null;
   if (camStream) { camStream.getTracks().forEach(t => t.stop()); camStream = null; }
   camVideoEl.srcObject = null;
   btnCam.classList.remove("active");
   btnCam.textContent = "◉ Camera";
   setCamHint("Camera off — with the camera on, your real jaw and lips drive the figure.");
+}
+
+/* ---- tongue-tip from mouth-aperture pixels -------------------------------
+   The MediaPipe face model has NO tongue landmarks (478 face points only), so
+   the tongue tip is measured from the pixels inside the inner-lip aperture:
+   crop the inner-lip bounding box, classify tongue-coloured flesh (red-dominant,
+   mid-brightness with some saturation; teeth are bright and neutral, the oral
+   cavity is dark), and derive visibility / tip height / protrusion. The tip is
+   only measurable when it enters the aperture — between the teeth for /θ, ð/;
+   mostly occluded behind the teeth for /l, ɹ, n/. */
+const camPxCanvas = document.createElement("canvas");
+camPxCanvas.width = 64; camPxCanvas.height = 48;
+const camPx = camPxCanvas.getContext("2d", { willReadFrequently: true });
+
+function measureTongue() {
+  const lm = camLandmarks;
+  if (!lm || !lm[13] || !lm[14] || !lm[78] || !lm[308]) return null;
+  const vw = camVideoEl.videoWidth || 640, vh = camVideoEl.videoHeight || 480;
+  const xs = [], ys = [];
+  for (const i of CAM_LIP_INNER) { xs.push(lm[i].x * vw); ys.push(lm[i].y * vh); }
+  const bx0 = Math.min(...xs), bx1 = Math.max(...xs), by0 = Math.min(...ys), by1 = Math.max(...ys);
+  const iw = (bx1 - bx0) * 0.86, ih = (by1 - by0) * 0.86;   // inset: stay inside the lip line
+  if (iw < 6 || ih < 6) return { vis: 0, tip: 0, prot: 0, pt: [0.5, 0.5] };
+  camPx.drawImage(camVideoEl, bx0 + (bx1 - bx0) * 0.07, by0 + (by1 - by0) * 0.07, iw, ih, 0, 0, 64, 48);
+  const img = camPx.getImageData(0, 0, 64, 48).data;
+  let n = 0, vis = 0, topY = 48, sx = 0, sy = 0;
+  for (let y = 0; y < 48; y++) for (let x = 0; x < 64; x++) {
+    const i = (y * 64 + x) * 4, r = img[i], g = img[i + 1], b = img[i + 2];
+    const v = Math.max(r, g, b), mn = Math.min(r, g, b);
+    n++;
+    // tongue flesh: red-dominant, mid brightness, some saturation.
+    // teeth: bright + neutral (r≈g≈b) → excluded; cavity: dark → excluded.
+    if (r > 55 && r > g * 1.10 && r > b * 1.03 && v < 225 && (v - mn) > 14) {
+      vis++;
+      if (y < topY) topY = y;
+      sx += x; sy += y;
+    }
+  }
+  if (!n || !vis) return { vis: 0, tip: 0, prot: 0, pt: [0.5, 0.5] };
+  const fill = clamp(vis / (0.42 * n), 0, 1);        // ~42 % aperture fill = fully visible
+  const tip = clamp(1 - topY / 47, 0, 1);            // 1 = tongue reaches the upper teeth
+  const prot = clamp(fill * (0.35 + 0.65 * tip), 0, 1);
+  // centroid in crop-normalised coords → inner-lip bbox coords (for the PiP dot)
+  const cx = 0.07 + 0.86 * ((sx / vis) / 64), cy = 0.07 + 0.86 * ((sy / vis) / 48);
+  return { vis: fill, tip, prot, pt: [cx, cy] };
 }
 
 function camTick() {
@@ -2369,10 +2698,15 @@ function camTick() {
         camLandmarks = res.faceLandmarks[0];
         const cats = res.faceBlendshapes && res.faceBlendshapes[0]
           ? res.faceBlendshapes[0].categories : null;
-        let jaw = 0, pucker = 0;
+        let jaw = 0;
+        const bs = { mouthPucker: 0, mouthFunnel: 0, mouthStretch: 0, mouthSmile: 0, mouthRoll: 0 };
         if (cats) for (const c of cats) {
           if (c.categoryName === "jawOpen") jaw = c.score;
-          else if (c.categoryName === "mouthPucker") pucker = c.score;
+          else if (c.categoryName === "mouthPucker") bs.mouthPucker = c.score;
+          else if (c.categoryName === "mouthFunnel") bs.mouthFunnel = c.score;
+          else if (c.categoryName === "mouthStretchLeft" || c.categoryName === "mouthStretchRight") bs.mouthStretch += c.score / 2;
+          else if (c.categoryName === "mouthSmileLeft" || c.categoryName === "mouthSmileRight") bs.mouthSmile += c.score / 2;
+          else if (c.categoryName === "mouthRollUpper" || c.categoryName === "mouthRollLower") bs.mouthRoll += c.score / 2;
         }
         camJawRaw = clamp(jaw, 0, 1);
         // Lip aperture in cm: inner-lip distance (landmarks 13–14) scaled by
@@ -2380,16 +2714,54 @@ function camTick() {
         const lm = camLandmarks, vw = camVideoEl.videoWidth || 640, vh = camVideoEl.videoHeight || 480;
         if (lm[13] && lm[14] && lm[10] && lm[152]) {
           const dist = (a, b) => Math.hypot((a.x - b.x) * vw, (a.y - b.y) * vh);
+          const d2 = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);   // landmark space (lip-lab)
           const face = dist(lm[10], lm[152]);
-          camLipRaw = {
-            gap: face > 1 ? clamp(18.5 * dist(lm[13], lm[14]) / face, 0, 2.2) : 0,
-            prot: lerp(-0.05, 0.6, clamp(pucker, 0, 1)),
+          const gap = face > 1 ? clamp(18.5 * dist(lm[13], lm[14]) / face, 0, 2.2) : 0;
+          // Rounding / spreading / protrusion: the proven lip-lab derives,
+          // relative to a per-face neutral (auto-captured from relaxed frames).
+          const iod = d2(lm[33], lm[263]) || 1e-6;
+          const faceW = d2(lm[234], lm[454]) || iod;
+          const feat = {
+            width: d2(lm[61], lm[291]) / faceW,
+            zRel: ((lm[1].z + lm[152].z + lm[168].z) / 3 - (lm[13].z + lm[14].z) / 2) / iod,
+            pucker: bs.mouthPucker, funnel: bs.mouthFunnel,
+            stretch: bs.mouthStretch, smile: bs.mouthSmile, roll: bs.mouthRoll,
           };
+          const LIP_KEYS = ["width", "zRel", "pucker", "funnel", "stretch", "smile", "roll"];
+          if (!camNeutral) {
+            if (!camNeutralAcc) camNeutralAcc = { n: 0, tries: 0 };
+            camNeutralAcc.tries++;
+            const relaxed = jaw < 0.25 && feat.pucker < 0.15 && feat.smile < 0.15 && feat.stretch < 0.15;
+            if (relaxed || camNeutralAcc.tries > 90) {        // relaxed face first, any face after 3 s
+              camNeutralAcc.n++;
+              for (const k of LIP_KEYS) camNeutralAcc[k] = (camNeutralAcc[k] || 0) + feat[k];
+            }
+            if (camNeutralAcc.n >= 15) {
+              camNeutral = {};
+              for (const k of LIP_KEYS) camNeutral[k] = camNeutralAcc[k] / camNeutralAcc.n;
+            }
+          }
+          if (camNeutral) {
+            const dWidth = (feat.width - camNeutral.width) / Math.max(camNeutral.width, 1e-6);
+            const round = clamp(0.5 - 1.2 * dWidth + 0.35 * (feat.pucker - camNeutral.pucker)
+                                + 0.2 * (feat.funnel - camNeutral.funnel), 0, 1);
+            const spread = clamp(0.5 + 1.2 * dWidth + 0.35 * (feat.stretch - camNeutral.stretch)
+                                 + 0.25 * (feat.smile - camNeutral.smile), 0, 1);
+            const protIdx = clamp(0.5 + 20 * (feat.zRel - camNeutral.zRel)
+                                  + 0.35 * ((feat.pucker - camNeutral.pucker) - (feat.funnel - camNeutral.funnel))
+                                  + 0.25 * (feat.roll - camNeutral.roll), 0, 1);
+            camLipRaw = { gap, prot: lerp(-0.05, 0.6, protIdx), round, spread };
+          } else {
+            camLipRaw = { gap, prot: lerp(-0.05, 0.6, clamp(bs.mouthPucker, 0, 1)),
+                          round: 0.5, spread: 0.5 };   // until the neutral is captured
+          }
+          if ((camTickN++ & 1) === 0) camTongueRaw = measureTongue();   // every 2nd frame
         }
       } else {
         camLandmarks = null;
         camJawRaw = 0;
         camLipRaw = null;
+        camTongueRaw = null;
       }
     } catch (e) { /* keep the loop alive */ }
   }
@@ -2414,8 +2786,18 @@ function updateJaw() {
     if (!camLip) camLip = { ...camLipRaw };
     camLip.gap += (camLipRaw.gap - camLip.gap) * 0.3;
     camLip.prot += (camLipRaw.prot - camLip.prot) * 0.3;
+    camLip.round += (camLipRaw.round - camLip.round) * 0.3;
+    camLip.spread += (camLipRaw.spread - camLip.spread) * 0.3;
   } else {
     camLip = null;
+  }
+  if (camOn && camTongueRaw) {
+    if (!camTongue) camTongue = { ...camTongueRaw };
+    camTongue.vis += (camTongueRaw.vis - camTongue.vis) * 0.35;
+    camTongue.tip += (camTongueRaw.tip - camTongue.tip) * 0.35;
+    camTongue.prot += (camTongueRaw.prot - camTongue.prot) * 0.35;
+  } else {
+    camTongue = null;
   }
 }
 
@@ -2589,16 +2971,18 @@ if (!window.isSecureContext) {
 //   ?view=bark      opens a cartesian chart (tongue | bark | linear)
 //   ?jaw=0.6        forces a jaw opening (0..1) for headless checks
 //   ?nasal=0.8      forces the velopharyngeal port (0=closed, 1=open)
+//   ?lip=r,s        camera lip fusion off-camera (rounding 0..1, spreading 0..1)
+//   ?tongue=v,t,p   forces the tongue-tip cue off-camera (vis/tip/prot 0..1)
 //   ?camera=1       starts the front camera automatically (headless checks)
-//   ?pose=i|ɑ|u|…|rest|s|sh   holds a prototype posture (no microphone needed)
+//   ?pose=i|ɑ|u|…|rest|s|sh|th   holds a prototype posture (no microphone needed)
 //   ?target=ɑ       pins the target vowel;  ?labels=0  hides the labels
-const NAMED_POSES = { rest: REST_POSE, s: S_POSE, sh: SH_POSE, ...VOWEL_POSE };
+const NAMED_POSES = { rest: REST_POSE, s: S_POSE, sh: SH_POSE, th: TH_POSE, ...VOWEL_POSE };
 const params = new URLSearchParams(location.search);
 const demo = params.get("demo");
 if (demo) {
-  const [df1, df2] = demo.split(",").map(Number);
+  const [df1, df2, df3, df4] = demo.split(",").map(Number);
   if (isFinite(df1) && isFinite(df2)) {
-    latest = { f1: df1, f2: df2 };
+    latest = { f1: df1, f2: df2, f3: isFinite(df3) ? df3 : null, f4: isFinite(df4) ? df4 : null };
     lastVoicedAt = performance.now() + 1e9;
   }
 }
@@ -2612,6 +2996,25 @@ if (params.get("camera") === "1") setTimeout(camStart, 400);
 if (NAMED_POSES[params.get("pose")]) poseForced = NAMED_POSES[params.get("pose")];
 if (params.get("target")) setTarget(params.get("target"));
 if (params.get("labels") === "0") { showLabels = false; $("btnLabels").classList.remove("active"); }
+// ?lip=round,spread[,gap,prot] — camera lip fusion without a camera (test/demo hook).
+const lipParam = params.get("lip");
+if (lipParam) {
+  const [lr, ls, lg, lp] = lipParam.split(",").map(Number);
+  if (isFinite(lr)) lipForced = {
+    round: clamp(lr, 0, 1), spread: clamp(isFinite(ls) ? ls : 0.5, 0, 1),
+    ...(isFinite(lg) ? { gap: clamp(lg, 0, 2.2) } : {}),
+    ...(isFinite(lp) ? { prot: clamp(lp, -0.2, 0.8) } : {}),
+  };
+}
+// ?tongue=vis[,tip,prot] — camera tongue-tip cue without a camera (test/demo hook).
+const tongueParam = params.get("tongue");
+if (tongueParam) {
+  const [tv, th, tp] = tongueParam.split(",").map(Number);
+  if (isFinite(tv)) tongueForced = {
+    vis: clamp(tv, 0, 1), tip: clamp(isFinite(th) ? th : 0.5, 0, 1),
+    prot: clamp(isFinite(tp) ? tp : 0.5, 0, 1),
+  };
+}
 
 window.__vt = {
   voiceDbg: () => voiceDbg,
@@ -2634,6 +3037,27 @@ window.__vt = {
   // setNasal(0..1) forces a test value; setNasal(null) returns to live audio.
   setNasal: (v) => { nasalForced = (v == null || !isFinite(v)) ? null
                                                              : clamp(v, 0, 1); },
+  // setLip({round, spread, gap?, prot?}) forces the measured lip state used by
+  // the camera fusion; setLip(null) returns to live camera/none.
+  setLip: (v) => {
+    lipForced = v == null ? null
+      : { round: v.round != null ? clamp(v.round, 0, 1) : 0.5,
+          spread: v.spread != null ? clamp(v.spread, 0, 1) : 0.5,
+          ...(v.gap != null ? { gap: v.gap } : {}),
+          ...(v.prot != null ? { prot: v.prot } : {}) };
+  },
+  lipCues: () => ({ r: lipCue.r, p: lipCue.p, rLabel: lipCue.rLabel, pLabel: lipCue.pLabel }),
+  // setTongueTip({vis, tip, prot}) forces the measured tongue-tip state used by
+  // the camera fusion; setTongueTip(null) returns to live camera/none.
+  setTongueTip: (v) => {
+    tongueForced = v == null ? null
+      : { vis: clamp(v.vis != null ? v.vis : 0, 0, 1),
+          tip: clamp(v.tip != null ? v.tip : 0.5, 0, 1),
+          prot: clamp(v.prot != null ? v.prot : 0.5, 0, 1) };
+  },
+  tongueCues: () => ({ vis: tongueCue.vis, tip: tongueCue.tip, prot: tongueCue.prot,
+                       label: tongueCue.label, dental: tongueCue.dental,
+                       forced: tongueForced, cam: camOn ? (camTongue || null) : null }),
 };
 
 // Render loop — keeps the figure animated and responsive.
@@ -2643,6 +3067,8 @@ function renderLoop() {
   updateArticulation(now);
   updateNasality(now);
   updateVibration(now);
+  updateLipCues();
+  updateTongueCues();
   updateArtReadout(now);
   drawChart();
   requestAnimationFrame(renderLoop);
